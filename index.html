@@ -80,8 +80,7 @@
     <h2>How it works</h2>
     <p class="small">Mojang signs the exact <em>base64 text</em> of the <code>textures</code> value (its ASCII bytes) with RSA-4096, PKCS#1 v1.5 and SHA-1. This page recomputes that check with the browser's built-in WebCrypto against every key from
     <a href="https://api.minecraftservices.com/publickeys" rel="noreferrer">api.minecraftservices.com/publickeys</a>.
-    That endpoint does not send CORS headers, so a browser page cannot call it directly. The page tries anyway and otherwise falls back to
-    <a href="keys.json">keys.json</a>, a copy refreshed daily by a <a href="https://github.com/kolya5544/MCSignature/blob/master/.github/workflows/update-keys.yml">GitHub Action</a>. You can also paste the live response above.
+    The keys are cached locally in <a href="keys.json">keys.json</a>, which a <a href="https://github.com/kolya5544/MCSignature/blob/master/.github/workflows/update-keys.yml">GitHub Action</a> refreshes daily. You can also paste the live response above.
     Source: <a href="verify.js">verify.js</a>, under 80 lines.</p>
   </section>
 </main>
@@ -118,9 +117,11 @@
       const r = await fetch("keys.json", { cache: "no-cache" });
       const set = await r.json();
       if (!validKeySet(set)) throw new Error("unexpected keys.json");
-      keys = { set, label: "bundled snapshot" };
-      status.textContent = "Live fetch is blocked by the browser (no CORS), so using the bundled snapshot keys.json" +
-        (set.fetchedAt ? " from " + set.fetchedAt : "") + ". Paste a fresh response below to verify against the current live keys.";
+      keys = { set, label: "cached locally (keys.json)" };
+      const a = el("a", LIVE_URL);
+      a.href = LIVE_URL; a.rel = "noreferrer";
+      status.replaceChildren("Keys are automatically fetched from Mojang and cached locally. However, you can open the corresponding page: ", a,
+        " yourself, and copy-paste the JSON string from there.");
     } catch (e) {
       status.textContent = "Could not load any public keys (" + e.message + "). Paste the /publickeys JSON below.";
     }
