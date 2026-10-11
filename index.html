@@ -217,6 +217,15 @@
     if (!Object.keys(tex).length) addRow(dl, "Textures", "(none)");
     box.append(dl);
     if (trusted) renderPreviews(box, tex);
+
+    const det = el("details");
+    const ta = el("textarea");
+    ta.readOnly = true;
+    ta.rows = 12;
+    ta.spellcheck = false;
+    ta.value = JSON.stringify(p, null, 2);
+    det.append(el("summary", "Show signed JSON"), ta, el("p", "Decoded from the base64 value and re-indented for reading.", "small"));
+    box.append(det);
   }
 
   async function verify() {
