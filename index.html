@@ -45,13 +45,17 @@
   a { color: var(--accent); }
   details { margin-top: 10px; }
   summary { cursor: pointer; }
+  .previews { display: flex; gap: 16px; align-items: flex-end; margin-top: 12px; }
+  .previews figure { margin: 0; text-align: center; }
+  .previews figcaption { font-size: .8rem; color: var(--muted); margin-top: 4px; }
+  .previews canvas { display: block; image-rendering: pixelated; border: 1px solid var(--line); border-radius: 4px; }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <main>
   <h1>MCSignature</h1>
-  <p class="lead">Check that a Minecraft <code>textures</code> property was really signed by Mojang. Everything runs locally in your browser; the page does not send what you paste anywhere.</p>
+  <p class="lead">Check that a Minecraft <code>textures</code> property was really signed by Mojang. Everything runs locally in your browser; the page does not send what you paste anywhere. When the signature is valid it also loads the skin and cape images from <code>textures.minecraft.net</code> to preview them.</p>
 
   <section>
     <label for="value">Textures value (base64)</label>
@@ -92,8 +96,8 @@
   const $ = (id) => document.getElementById(id);
   const LIVE_URL = "https://api.minecraftservices.com/publickeys";
   const EXAMPLE = {
-    value: "eyJ0aW1lc3RhbXAiOjE3OTE0ODkxNTE3MzgsInByb2ZpbGVJZCI6IjYwNjIwYWY4ODM3MDQxMzE4MDQwMzFhNGQ5ZTNkYjA4IiwicHJvZmlsZU5hbWUiOiJTWlAxTDNDWks0MjIzIiwic2lnbmF0dXJlUmVxdWlyZWQiOnRydWUsInRleHR1cmVzIjp7IkNBUEUiOnsidXJsIjoiaHR0cHM6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNTU2YmQ1MmY2NmZiNDJhMWMyZWNkZTY2NDUzYjcwZmM2ODU3NjZhNDZlYmJjZDY5NGE3YTEzZmEzYTI4NWY2NSJ9LCJTS0lOIjp7InVybCI6Imh0dHBzOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzQ2YWNkMDZlODQ4M2IxNzZlOGVhMzlmYzEyZmUxMDVlYjNhMmE0OTcwZjUxMDAwNTdlOWQ4NGQ0YjYwYmRmYTciLCJtZXRhZGF0YSI6eyJtb2RlbCI6InNsaW0ifX19fQ==",
-    signature: "xzcLnOedr6VH1pn9xISV0S6CKbtghigq0bUpS7F5Jy9NGRfXOcY3XMTNJm9MbMuehkfDW4yqfe+LaYNgARv5FQjYxOKRH1Jrw/d+gljCpgosk5XLul1kxuJmWxLCRJi0gd18oigvGTAbns5LblqAlYNByaVfsAIPrICgfzE0ftB+FGu9Il+xYskjdsj30LO7L6dalZoJewiui8dtrbon3uVO058aV4DpfkvT15rqnr1FRmy6j8ojwqzrljEc2tYYSjFycLqx3PjbmE6t7Jy097ALAadZFZqR+vhsq9MTl81FNUWw/UTQFsvgrV730YHMfkAdG9aZ3c8QJvgvj6RhwFpsJ1UwsLP9eIMeQ527vn2mFj1EU9dO6/KgYxtimZgQBmMy2VYdgRlzBhj1H26gL5lp6FLNZmVOcm+LbhGY4ElGaPtHIkvpx+FrJAj3RRAhn1MRuRcW009rhOxfK5bAkTRQaKynwk7acri8ZsUAcjs1BlV/Van0kli1gtL85mzOl8C6dE0r2Ez18M3bTlBZTlTWWAf7DfrrhkTbqcCQzoWx9pCRo6/Jh3BgwXwgEMBwl99R6PLMqVWw2LGU73F8Ph3/gRMCZ7s82EdvjZ7x5cfX6qVtZf2QOHtRB59XI1b3p0oxirplCcaA9QplMwYyzkFQQdN3iVry1Xfgo8ZiL1s="
+    value: "ewogICJ0aW1lc3RhbXAiIDogMTc5MTcyODA4NDE4NSwKICAicHJvZmlsZUlkIiA6ICJjZjAxNjA0NGM3NTQ0YmUwYjJkY2I0MDNlY2NlMTUwZCIsCiAgInByb2ZpbGVOYW1lIiA6ICJrb2x5YTU1NDQiLAogICJzaWduYXR1cmVSZXF1aXJlZCIgOiB0cnVlLAogICJ0ZXh0dXJlcyIgOiB7CiAgICAiU0tJTiIgOiB7CiAgICAgICJ1cmwiIDogImh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvOGM1YTM4NDZhYzk5MTk2MWQ4NjhiZThkZTFiMTljOTllZDI3MzI3MWFhNzIzOGNlNzEyZWI5NjkxNmM5NmU2YyIsCiAgICAgICJtZXRhZGF0YSIgOiB7CiAgICAgICAgIm1vZGVsIiA6ICJzbGltIgogICAgICB9CiAgICB9LAogICAgIkNBUEUiIDogewogICAgICAidXJsIiA6ICJodHRwOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzE3OTEyNzkwZmYxNjRiOTMxOTZmMDhiYTcxZDBlNjIxMjkzMDQ3NzZkMGYzNDczMzRmOGE2ZWFlNTA5ZjhhNTYiCiAgICB9CiAgfQp9",
+    signature: "Uok6vopPVrOm+CbhG27QQXFoOyWGLweIKR339b+mqh4/YHpKS0cbO+JQrlXFxIjwZm86ycp+MdMxBTse91e2qQ2UzpbpbNRS4WC3kl4Nq2WaY8efIVEEcvY8HGM82DgSmfFoAmnIcV4mMG+ITFjyctoa7quHvIy1AStbkX1ip7DwogGnqsp4fKVuAeEfxDPgqY5Gn4NXaTVX5vWTBD1ccUU5hdNkPb7iuHPw9ZFjh356utnq/K44n9X9fD2BpGJM189D5+7pASxJy4Px5GA5CKLHMJF8vIGKRJPQntZO/Nuf/vXuoXfPUaeTGdnrXyc+cdCjznZB5yB9kYKZQJo9Mvb0f2TqC7n3h26IcIykWRj52tOwCnC+Q8HfxADRaGHQMQ3+lY5tJxacEQgcA9xxRYAb6P+6K8vcdHR7IynVD1oVA3HfNSC15LI0S0CNPmE2pORJ4iyEMhQbKZmaWCeR3iqw7kbG9lecQj9o/DkBCxXSfRfSgeD4CuyVmeqjb0CC12SwKFKEtHwPBe3xlXrs2dDvw7iwTdo13G7/GtLOFawA501Rq1XL3KdN1KCjRkcuyKKIXAxNCYvPvqL4i2j1ztMeajP1pzQoqoIQoFC0kWcPVLCDAMe5vRBn/WfeOlOpnD2zMsUh8/+xJXD8Y+esdd5rF3Uom88lXVquUtcy4XY="
   };
 
   let keys = null; // { set, label }
@@ -150,7 +154,51 @@
     return a;
   }
 
-  function renderPayload(box, p) {
+  // Only ever load images from Mojang's texture host, and only over https
+  // (the signed payload often says http://, which an https page can't mix).
+  function textureImageUrl(url) {
+    try {
+      const u = new URL(url);
+      if (u.hostname !== "textures.minecraft.net") return null;
+      return "https://textures.minecraft.net" + u.pathname;
+    } catch (e) { return null; }
+  }
+
+  // drawImage works on cross-origin images without CORS; we never read pixels back.
+  // Texture layouts scale with width/64 (HD skins and capes are 128, 256, …).
+  function addPreview(box, label, url, w, h, cssW, cssH, regions) {
+    const fig = el("figure");
+    const canvas = el("canvas");
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", label);
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
+    fig.append(canvas, el("figcaption", label));
+    box.append(fig);
+    const img = new Image();
+    img.referrerPolicy = "no-referrer";
+    img.onload = () => {
+      const s = img.naturalWidth / 64;
+      canvas.width = w * s; canvas.height = h * s;
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      for (const [x, y] of regions) ctx.drawImage(img, x * s, y * s, w * s, h * s, 0, 0, w * s, h * s);
+    };
+    img.onerror = () => { fig.replaceChildren(el("figcaption", label + " unavailable")); };
+    img.src = url;
+  }
+
+  function renderPreviews(box, tex) {
+    const row = el("div", null, "previews");
+    const skin = tex.SKIN && textureImageUrl(tex.SKIN.url);
+    const cape = tex.CAPE && textureImageUrl(tex.CAPE.url);
+    // Head front (8,8) plus its hat overlay (40,8); cape back (1,1), 10x16.
+    if (skin) addPreview(row, "Head", skin, 8, 8, 128, 128, [[8, 8], [40, 8]]);
+    if (cape) addPreview(row, "Cape", cape, 10, 16, 100, 160, [[1, 1]]);
+    if (row.children.length) box.append(row);
+  }
+
+  function renderPayload(box, p, trusted) {
     box.append(el("h2", "Signed contents"));
     const dl = el("dl");
     if (p.timestamp != null) {
@@ -168,6 +216,7 @@
     }
     if (!Object.keys(tex).length) addRow(dl, "Textures", "(none)");
     box.append(dl);
+    if (trusted) renderPreviews(box, tex);
   }
 
   async function verify() {
@@ -222,7 +271,7 @@
     addRow(dl, "Signed bytes", MCSig.b64ToBytes(sig).length + "-byte signature over " + value.length + " ASCII bytes (SHA-1 " +
       await MCSig.digestHex("SHA-1", new TextEncoder().encode(value)) + ")");
     box.append(dl);
-    renderPayload(box, payload);
+    renderPayload(box, payload, res.valid);
     if (!res.valid) box.append(el("p", "The decoded contents above are shown for inspection only. They are not trustworthy.", "small"));
     dl.querySelectorAll("dd").forEach((dd) => { dd.style.whiteSpace = "pre-line"; });
   }
