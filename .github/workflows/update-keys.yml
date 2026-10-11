@@ -1,0 +1,33 @@
+name: Refresh keys.json
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch /publickeys
+        run: |
+          curl -fsS https://api.minecraftservices.com/publickeys \
+            | jq -S '.' > new.json
+          # Only touch the file (and its fetchedAt stamp) when the keys changed.
+          if ! diff -q <(jq -S 'del(.fetchedAt)' keys.json) new.json >/dev/null; then
+            jq --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '. + {fetchedAt: $t}' new.json > keys.json
+          fi
+          rm new.json
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add keys.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update keys.json"
+            git push
+          fi

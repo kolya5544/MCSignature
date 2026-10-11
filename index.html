@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCSignature</title>
+<meta name="description" content="Verify a Minecraft textures property signature in your browser against Mojang's public keys.">
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1b1b1f; --muted: #62626b; --card: #fff; --line: #d9d9e0;
+    --ok: #12703a; --ok-bg: #e3f6ea; --bad: #a3201f; --bad-bg: #fde8e7; --warn: #8a5a00; --warn-bg: #fff3d6;
+    --accent: #2f5fd0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141417; --fg: #e7e7ea; --muted: #9b9ba6; --card: #1c1c21; --line: #34343c;
+      --ok: #6fdc9a; --ok-bg: #12301f; --bad: #ff9c97; --bad-bg: #38191a; --warn: #f0c36a; --warn-bg: #35290f;
+      --accent: #8aa8ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  p.lead { margin: 0 0 20px; color: var(--muted); }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin-bottom: 4px; }
+  textarea { width: 100%; font: 13px/1.4 ui-monospace, Consolas, monospace; color: var(--fg); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px; resize: vertical; word-break: break-all; }
+  textarea + label { margin-top: 12px; }
+  button { font: inherit; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent);
+    color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .banner { padding: 12px 14px; border-radius: 8px; font-weight: 600; }
+  .ok { background: var(--ok-bg); color: var(--ok); }
+  .bad { background: var(--bad-bg); color: var(--bad); }
+  .warn { background: var(--warn-bg); color: var(--warn); }
+  .small { font-size: .875rem; color: var(--muted); }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 8px 0 0; }
+  dt { color: var(--muted); }
+  dd { margin: 0; word-break: break-all; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: .85em; }
+  a { color: var(--accent); }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>MCSignature</h1>
+  <p class="lead">Check that a Minecraft <code>textures</code> property was really signed by Mojang. Everything runs locally in your browser; the page does not send what you paste anywhere.</p>
+
+  <section>
+    <label for="value">Textures value (base64)</label>
+    <textarea id="value" rows="5" spellcheck="false" placeholder="eyJ0aW1lc3RhbXAiOi…  (a full {&quot;name&quot;,&quot;value&quot;,&quot;signature&quot;} JSON object also works)"></textarea>
+    <label for="sig">Signature (base64)</label>
+    <textarea id="sig" rows="5" spellcheck="false" placeholder="xzcLnOedr6VH1pn9…"></textarea>
+    <div class="row">
+      <button id="go">Verify</button>
+      <button id="example" class="secondary" type="button">Load example</button>
+    </div>
+  </section>
+
+  <section id="result" hidden aria-live="polite"></section>
+
+  <section>
+    <h2>Public keys</h2>
+    <div id="keystatus" class="small">Loading…</div>
+    <details>
+      <summary>Use different keys (paste <code>/publickeys</code> JSON)</summary>
+      <textarea id="keyjson" rows="5" spellcheck="false" placeholder='{"profilePropertyKeys":[{"publicKey":"MIICIjAN…"}], …}'></textarea>
+      <div class="row"><button id="usekeys" class="secondary" type="button">Use these keys</button></div>
+    </details>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <p class="small">Mojang signs the exact <em>base64 text</em> of the <code>textures</code> value (its ASCII bytes) with RSA-4096, PKCS#1 v1.5 and SHA-1. This page recomputes that check with the browser's built-in WebCrypto against every key from
+    <a href="https://api.minecraftservices.com/publickeys" rel="noreferrer">api.minecraftservices.com/publickeys</a>.
+    That endpoint does not send CORS headers, so a browser page cannot call it directly. The page tries anyway and otherwise falls back to
+    <a href="keys.json">keys.json</a>, a copy refreshed daily by a <a href="https://github.com/kolya5544/MCSignature/blob/master/.github/workflows/update-keys.yml">GitHub Action</a>. You can also paste the live response above.
+    Source: <a href="verify.js">verify.js</a>, under 80 lines.</p>
+  </section>
+</main>
+
+<script src="verify.js"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const LIVE_URL = "https://api.minecraftservices.com/publickeys";
+  const EXAMPLE = {
+    value: "eyJ0aW1lc3RhbXAiOjE3OTE0ODkxNTE3MzgsInByb2ZpbGVJZCI6IjYwNjIwYWY4ODM3MDQxMzE4MDQwMzFhNGQ5ZTNkYjA4IiwicHJvZmlsZU5hbWUiOiJTWlAxTDNDWks0MjIzIiwic2lnbmF0dXJlUmVxdWlyZWQiOnRydWUsInRleHR1cmVzIjp7IkNBUEUiOnsidXJsIjoiaHR0cHM6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNTU2YmQ1MmY2NmZiNDJhMWMyZWNkZTY2NDUzYjcwZmM2ODU3NjZhNDZlYmJjZDY5NGE3YTEzZmEzYTI4NWY2NSJ9LCJTS0lOIjp7InVybCI6Imh0dHBzOi8vdGV4dHVyZXMubWluZWNyYWZ0Lm5ldC90ZXh0dXJlLzQ2YWNkMDZlODQ4M2IxNzZlOGVhMzlmYzEyZmUxMDVlYjNhMmE0OTcwZjUxMDAwNTdlOWQ4NGQ0YjYwYmRmYTciLCJtZXRhZGF0YSI6eyJtb2RlbCI6InNsaW0ifX19fQ==",
+    signature: "xzcLnOedr6VH1pn9xISV0S6CKbtghigq0bUpS7F5Jy9NGRfXOcY3XMTNJm9MbMuehkfDW4yqfe+LaYNgARv5FQjYxOKRH1Jrw/d+gljCpgosk5XLul1kxuJmWxLCRJi0gd18oigvGTAbns5LblqAlYNByaVfsAIPrICgfzE0ftB+FGu9Il+xYskjdsj30LO7L6dalZoJewiui8dtrbon3uVO058aV4DpfkvT15rqnr1FRmy6j8ojwqzrljEc2tYYSjFycLqx3PjbmE6t7Jy097ALAadZFZqR+vhsq9MTl81FNUWw/UTQFsvgrV730YHMfkAdG9aZ3c8QJvgvj6RhwFpsJ1UwsLP9eIMeQ527vn2mFj1EU9dO6/KgYxtimZgQBmMy2VYdgRlzBhj1H26gL5lp6FLNZmVOcm+LbhGY4ElGaPtHIkvpx+FrJAj3RRAhn1MRuRcW009rhOxfK5bAkTRQaKynwk7acri8ZsUAcjs1BlV/Van0kli1gtL85mzOl8C6dE0r2Ez18M3bTlBZTlTWWAf7DfrrhkTbqcCQzoWx9pCRo6/Jh3BgwXwgEMBwl99R6PLMqVWw2LGU73F8Ph3/gRMCZ7s82EdvjZ7x5cfX6qVtZf2QOHtRB59XI1b3p0oxirplCcaA9QplMwYyzkFQQdN3iVry1Xfgo8ZiL1s="
+  };
+
+  let keys = null; // { set, label }
+
+  function validKeySet(o) {
+    return o && typeof o === "object" &&
+      Object.values(o).some((l) => Array.isArray(l) && l.some((k) => k && typeof k.publicKey === "string"));
+  }
+
+  async function loadKeys() {
+    const status = $("keystatus");
+    try {
+      const r = await fetch(LIVE_URL, { cache: "no-store" });
+      const set = await r.json();
+      if (!validKeySet(set)) throw new Error("unexpected response");
+      keys = { set, label: "live from api.minecraftservices.com" };
+      status.textContent = "Using keys fetched live from api.minecraftservices.com.";
+      return;
+    } catch (e) { /* expected: no CORS headers on that endpoint */ }
+    try {
+      const r = await fetch("keys.json", { cache: "no-cache" });
+      const set = await r.json();
+      if (!validKeySet(set)) throw new Error("unexpected keys.json");
+      keys = { set, label: "bundled snapshot" };
+      status.textContent = "Live fetch is blocked by the browser (no CORS), so using the bundled snapshot keys.json" +
+        (set.fetchedAt ? " from " + set.fetchedAt : "") + ". Paste a fresh response below to verify against the current live keys.";
+    } catch (e) {
+      status.textContent = "Could not load any public keys (" + e.message + "). Paste the /publickeys JSON below.";
+    }
+  }
+
+  function el(tag, text, cls) {
+    const n = document.createElement(tag);
+    if (text != null) n.textContent = text;
+    if (cls) n.className = cls;
+    return n;
+  }
+
+  function addRow(dl, k, v) {
+    dl.append(el("dt", k));
+    const dd = el("dd");
+    if (v instanceof Node) dd.append(v); else dd.textContent = v;
+    dl.append(dd);
+  }
+
+  function safeLink(url) {
+    let u;
+    try { u = new URL(url); } catch (e) { return el("span", String(url)); }
+    if (u.protocol !== "https:" && u.protocol !== "http:") return el("span", String(url));
+    const a = el("a", url);
+    a.href = u.href; a.rel = "noreferrer noopener"; a.target = "_blank";
+    return a;
+  }
+
+  function renderPayload(box, p) {
+    box.append(el("h2", "Signed contents"));
+    const dl = el("dl");
+    if (p.timestamp != null) {
+      const d = new Date(Number(p.timestamp));
+      addRow(dl, "Timestamp", isNaN(d) ? String(p.timestamp) : d.toISOString() + " (" + p.timestamp + ")");
+    }
+    if (p.profileName != null) addRow(dl, "Profile name", String(p.profileName));
+    if (p.profileId != null) addRow(dl, "Profile ID", String(p.profileId));
+    if (p.signatureRequired != null) addRow(dl, "Signature required", String(p.signatureRequired));
+    const tex = p.textures && typeof p.textures === "object" ? p.textures : {};
+    for (const [type, t] of Object.entries(tex)) {
+      if (!t || typeof t !== "object") continue;
+      addRow(dl, type, safeLink(t.url));
+      if (t.metadata && t.metadata.model) addRow(dl, type + " model", String(t.metadata.model));
+    }
+    if (!Object.keys(tex).length) addRow(dl, "Textures", "(none)");
+    box.append(dl);
+  }
+
+  async function verify() {
+    const box = $("result");
+    box.hidden = false;
+    box.replaceChildren();
+
+    let value = $("value").value.trim();
+    let sig = $("sig").value.trim();
+    // Accept a pasted {"name":"textures","value":…,"signature":…} object.
+    if (value.startsWith("{")) {
+      try {
+        const o = JSON.parse(value);
+        if (o.value) { value = String(o.value); $("value").value = value; }
+        if (o.signature && !sig) { sig = String(o.signature); $("sig").value = sig; }
+      } catch (e) { /* fall through to base64 error */ }
+    }
+    value = MCSig.stripWs(value);
+    sig = MCSig.stripWs(sig);
+
+    const fail = (msg) => box.append(el("div", msg, "banner warn"));
+    if (!value || !sig) return fail("Paste both the textures value and the signature.");
+    if (!keys) return fail("No public keys loaded yet.");
+
+    let payload;
+    try { payload = MCSig.decodeTextures(value); }
+    catch (e) { return fail("The textures value is not base64-encoded JSON (" + e.message + ")."); }
+
+    let res;
+    try { res = await MCSig.verifyAgainstKeySet(value, sig, keys.set); }
+    catch (e) { return fail("Signature is malformed: " + e.message); }
+
+    if (res.valid) {
+      box.append(el("div", "Valid. Signed by a Mojang key.", "banner ok"));
+    } else {
+      box.append(el("div", "Invalid. No Mojang key (" + res.tried + " tried) verifies this signature for this value.", "banner bad"));
+    }
+
+    const dl = el("dl");
+    if (res.valid) {
+      const byFp = new Map();
+      for (const m of res.matches) {
+        if (!byFp.has(m.fingerprint)) byFp.set(m.fingerprint, []);
+        byFp.get(m.fingerprint).push(m.group + "[" + m.index + "]");
+      }
+      for (const [fp, where] of byFp) addRow(dl, "Matching key", where.join(", ") + "\nSHA-256 " + fp);
+      if (!res.matches.some((m) => m.group === "profilePropertyKeys")) {
+        box.append(el("div", "The matching key is not in profilePropertyKeys, which is the group Mojang uses for texture properties.", "banner warn"));
+      }
+    }
+    addRow(dl, "Key source", keys.label);
+    addRow(dl, "Signed bytes", MCSig.b64ToBytes(sig).length + "-byte signature over " + value.length + " ASCII bytes (SHA-1 " +
+      await MCSig.digestHex("SHA-1", new TextEncoder().encode(value)) + ")");
+    box.append(dl);
+    renderPayload(box, payload);
+    if (!res.valid) box.append(el("p", "The decoded contents above are shown for inspection only. They are not trustworthy.", "small"));
+    dl.querySelectorAll("dd").forEach((dd) => { dd.style.whiteSpace = "pre-line"; });
+  }
+
+  $("go").addEventListener("click", verify);
+  $("example").addEventListener("click", () => {
+    $("value").value = EXAMPLE.value; $("sig").value = EXAMPLE.signature; verify();
+  });
+  $("usekeys").addEventListener("click", () => {
+    try {
+      const set = JSON.parse($("keyjson").value);
+      if (!validKeySet(set)) throw new Error("no publicKey entries found");
+      keys = { set, label: "pasted by you" };
+      $("keystatus").textContent = "Using the keys you pasted.";
+      if ($("value").value && $("sig").value) verify();
+    } catch (e) { $("keystatus").textContent = "Those keys were not usable: " + e.message; }
+  });
+
+  loadKeys();
+})();
+</script>
+</body>
+</html>
